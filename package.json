@@ -1,0 +1,15 @@
+{
+  "name": "net-ws",
+  "version": "0.1.0",
+  "description": "WebSocket client module for pixelpai on browser",
+  "readmeFilename": "README.md",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Seven",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^3.1.1"
+  }
+}
