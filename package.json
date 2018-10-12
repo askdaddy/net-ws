@@ -14,8 +14,11 @@
     "url": "https://github.com/askdaddy/net-ws.git"
   },
   "devDependencies": {
+    "@types/bluebird": "^3.5.24",
     "@types/node": "^10.11.5",
+    "bluebird": "^3.5.2",
     "buffer": "^5.2.1",
+    "engine.io-client": "^3.2.1",
     "tslint": "^5.11.0",
     "typescript": "^3.1.1",
     "winston": "^3.1.0"

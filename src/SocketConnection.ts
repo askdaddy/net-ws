@@ -8,6 +8,15 @@ export interface ServerAddress {
     readonly port: Number
 }
 
+export class SocketConnectionError extends Error {
+    name = "SocketConnectionError";
+
+    constructor(reason: any) {
+        super(`SocketConnectionError: ${JSON.stringify(reason)}`)
+        this.stack = new Error().stack;
+    }
+}
+
 export class SocketConnection {
     private mServerAddr?: ServerAddress;
     private mBuffer?: Buffer;

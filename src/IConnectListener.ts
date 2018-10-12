@@ -1,5 +1,4 @@
-import {SocketConnection} from "./SocketConnection";
-import {SocketConnectionError} from "./SocketConnectionError";
+import {SocketConnection, SocketConnectionError} from "./SocketConnection";
 
 export interface IConnectListener {
     onConnected(connection: SocketConnection): void;
