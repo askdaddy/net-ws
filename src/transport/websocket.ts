@@ -1,7 +1,8 @@
 import {EventEmitter} from 'events';
 import {Promise} from 'bluebird';
-import {WebSocket} from './wsfallback';
+import {Wsfallback} from './wsfallback';
 
+const WebSocket = Wsfallback.WebSocket();
 
 
 enum ReadyState {
@@ -18,14 +19,24 @@ export class WS extends EventEmitter {
     _port: number;
     _connection: any = undefined;
     _readyState: ReadyState = ReadyState.CLOSED;
-    _packets_q: Buffer[] = [];
+    _packets_q: Buffer[] = [];// FIFO queue;
+    _writeable: Boolean = false;
+    _sent_count: number = 0;
 
     constructor(host: string, port?: number) {
         super()
         this._host = host;
         this._port = port || 80;
+    }
 
+    public Open() {
+        this.doOpen();
+    }
 
+    public Close() {
+        if (ReadyState.OPEN === this._readyState || ReadyState.CONNECTING === this._readyState) {
+            this.doClose();
+        }
     }
 
     private addCallBacks() {
@@ -49,11 +60,13 @@ export class WS extends EventEmitter {
 
     private onOpen() {
         this._readyState = ReadyState.OPEN;
+        this._writeable = true;
         this.emit('open');
     }
 
     private onClose() {
         this._readyState = ReadyState.CLOSED;
+        this._writeable = false;
         this.emit('close');
     }
 
@@ -61,22 +74,13 @@ export class WS extends EventEmitter {
         this.emit('packet', data);
     }
 
-    public Open() {
-        this.doOpen();
-    }
-
-    public Close() {
-        if (ReadyState.OPEN === this._readyState || ReadyState.CONNECTING === this._readyState) {
-            this.doClose();
-        }
-    }
 
     private doOpen() {
         /**
          * Get either the `WebSocket` or `MozWebSocket` globals
          * in the browser
          */
-        if (!WebSocket) {
+        if (typeof WebSocket === 'undefined') {
             this.emit(`error`, `WebSocket is NOT support by this Browser.`)
             return
         }
@@ -110,10 +114,10 @@ export class WS extends EventEmitter {
     }
 
     private write() {
-        if (this._packets_q.length > 0) {
-
+        if (this._packets_q.length > 0 && this._writeable) {
             let packet = this._packets_q.shift();
 
+            this._writeable = false; // write lock!
             new Promise((resolve, reject) => {
                 try {
                     this._connection.send(packet);
@@ -123,19 +127,18 @@ export class WS extends EventEmitter {
                 }
             }).then(() => {
                 // send ok
+                this.emit(`sent`, [++this._sent_count, packet]);
             }).catch(reason => {
                 this.emit(`error`, reason)
             }).finally(() => {
-                if (this._packets_q.length > 0)
-                    this.write();
-            })
-
-
-        }
-        else
-            Promise.delay(300).then(() => {
+                this._writeable = true;// write unlock
                 this.write();
             })
+        }
+        // else
+        //     Promise.delay(300).then(() => {
+        //         this.write();
+        //     })
     }
 
     public Send(packet: Buffer) {

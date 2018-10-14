@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const events_1 = require("events");
 const bluebird_1 = require("bluebird");
 const wsfallback_1 = require("./wsfallback");
+const WebSocket = wsfallback_1.Wsfallback.WebSocket();
 var ReadyState;
 (function (ReadyState) {
     ReadyState[ReadyState["CONNECTING"] = 0] = "CONNECTING";
@@ -17,8 +18,18 @@ class WS extends events_1.EventEmitter {
         this._connection = undefined;
         this._readyState = ReadyState.CLOSED;
         this._packets_q = [];
+        this._writeable = false;
+        this._sent_count = 0;
         this._host = host;
         this._port = port || 80;
+    }
+    Open() {
+        this.doOpen();
+    }
+    Close() {
+        if (ReadyState.OPEN === this._readyState || ReadyState.CONNECTING === this._readyState) {
+            this.doClose();
+        }
     }
     addCallBacks() {
         this._connection.onopen = () => {
@@ -36,31 +47,25 @@ class WS extends events_1.EventEmitter {
     }
     onOpen() {
         this._readyState = ReadyState.OPEN;
+        this._writeable = true;
         this.emit('open');
     }
     onClose() {
         this._readyState = ReadyState.CLOSED;
+        this._writeable = false;
         this.emit('close');
     }
     onData(data) {
         this.emit('packet', data);
     }
-    Open() {
-        this.doOpen();
-    }
-    Close() {
-        if (ReadyState.OPEN === this._readyState || ReadyState.CONNECTING === this._readyState) {
-            this.doClose();
-        }
-    }
     doOpen() {
-        if (!wsfallback_1.WebSocket) {
+        if (typeof WebSocket === 'undefined') {
             this.emit(`error`, `WebSocket is NOT support by this Browser.`);
             return;
         }
         let uri = this.uri();
         try {
-            this._connection = new wsfallback_1.WebSocket(uri);
+            this._connection = new WebSocket(uri);
             this._connection.binaryType = 'arraybuffer';
             this.addCallBacks();
         }
@@ -85,8 +90,9 @@ class WS extends events_1.EventEmitter {
         return schema + '://' + this._host + port;
     }
     write() {
-        if (this._packets_q.length > 0) {
+        if (this._packets_q.length > 0 && this._writeable) {
             let packet = this._packets_q.shift();
+            this._writeable = false;
             new bluebird_1.Promise((resolve, reject) => {
                 try {
                     this._connection.send(packet);
@@ -96,17 +102,14 @@ class WS extends events_1.EventEmitter {
                     reject(e);
                 }
             }).then(() => {
+                this.emit(`sent`, [++this._sent_count, packet]);
             }).catch(reason => {
                 this.emit(`error`, reason);
             }).finally(() => {
-                if (this._packets_q.length > 0)
-                    this.write();
-            });
-        }
-        else
-            bluebird_1.Promise.delay(300).then(() => {
+                this._writeable = true;
                 this.write();
             });
+        }
     }
     Send(packet) {
         if (ReadyState.OPEN === this._readyState) {

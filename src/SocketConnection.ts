@@ -52,7 +52,6 @@ export class SocketConnection {
         return false;
     }
 
-
     sendPacket(pkt: Packet): void {
         if (this.isConnected()) {
             try {

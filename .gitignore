@@ -55,3 +55,4 @@ typings/
 .nuxt
 .vuepress/dist
 .serverless
+build/compiled
